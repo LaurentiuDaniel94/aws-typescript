@@ -18,9 +18,9 @@ jobs:
           fetch-depth: 2
 
       - name: Setup Node.js environment
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 22
           cache: "npm"
 
       - name: Install dependencies
@@ -29,15 +29,25 @@ jobs:
       - name: Install AWS CDK
         run: npm i -g aws-cdk
 
-      - name: Configure aws credentials
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Bootstrap AWS environment
-        run: cdk bootstrap aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ secrets.AWS_REGION }}
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "Bootstrapping account $ACCOUNT_ID in region ${{ secrets.AWS_REGION }}"
+          cdk bootstrap aws://$ACCOUNT_ID/${{ secrets.AWS_REGION }}
+
+      - name: Verify Bootstrap
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          BUCKET_NAME=cdk-hnb659fds-assets-$ACCOUNT_ID-${{ secrets.AWS_REGION }}
+          echo "Verifying bootstrap bucket $BUCKET_NAME"
+          aws s3 ls s3://$BUCKET_NAME || { echo "Bucket $BUCKET_NAME does not exist. Bootstrap failed."; exit 1; }
 
       - name: Synth stack
         run: cdk synth
