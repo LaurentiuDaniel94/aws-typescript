@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js environment
         uses: actions/setup-node@v3
         with:
-          node-version: 22
+          node-version: 18
           cache: "npm"
 
       - name: Install dependencies
@@ -40,14 +40,19 @@ jobs:
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           echo "Bootstrapping account $ACCOUNT_ID in region ${{ secrets.AWS_REGION }}"
-          cdk bootstrap aws://$ACCOUNT_ID/${{ secrets.AWS_REGION }}
+          cdk bootstrap aws://$ACCOUNT_ID/${{ secrets.AWS_REGION }} --force || { echo "Bootstrap failed"; exit 1; }
 
       - name: Verify Bootstrap
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           BUCKET_NAME=cdk-hnb659fds-assets-$ACCOUNT_ID-${{ secrets.AWS_REGION }}
           echo "Verifying bootstrap bucket $BUCKET_NAME"
-          aws s3 ls s3://$BUCKET_NAME || { echo "Bucket $BUCKET_NAME does not exist. Bootstrap failed."; exit 1; }
+          if aws s3 ls s3://$BUCKET_NAME; then
+            echo "Bucket $BUCKET_NAME exists."
+          else
+            echo "Bucket $BUCKET_NAME does not exist. Bootstrap failed."
+            exit 1
+          fi
 
       - name: Synth stack
         run: cdk synth
